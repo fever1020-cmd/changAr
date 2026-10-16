@@ -16,10 +16,10 @@ async function getBrowser() {
             '--no-zygote',
         ];
 
+        // Puppeteer automatically resolves the installed Chrome path
         browserInstance = await puppeteer.launch({
             headless: true,
             args,
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
         });
     }
     return browserInstance;

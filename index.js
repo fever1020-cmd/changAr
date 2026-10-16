@@ -26,7 +26,11 @@ app.get('/api/search', async (req, res) => {
         res.json({ success: true, data: results });
     } catch (error) {
         console.error('Search error:', error);
-        res.status(500).json({ success: false, error: 'Failed to search AR level.' });
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || 'Failed to search AR level.',
+            stack: error.stack
+        });
     }
 });
 

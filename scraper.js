@@ -17,8 +17,9 @@ async function getBrowser() {
         ];
 
         browserInstance = await puppeteer.launch({
-            headless: 'new',
+            headless: true,
             args,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
         });
     }
     return browserInstance;

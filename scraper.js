@@ -5,13 +5,25 @@ let browserInstance = null;
 async function getBrowser() {
     if (!browserInstance || !browserInstance.connected) {
         console.log('[Scraper] Launching persistent browser instance...');
+
+        // Render.com (Linux) requires these args for Puppeteer to work
+        const args = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+            '--no-zygote',
+        ];
+
         browserInstance = await puppeteer.launch({
             headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args,
         });
     }
     return browserInstance;
 }
+
 
 async function searchARLevel(title) {
     const browser = await getBrowser();

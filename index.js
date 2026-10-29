@@ -34,31 +34,56 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-// New endpoint for image upload and OCR processing
+// Endpoint for image upload and OCR processing
 app.post('/api/upload-and-search', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No image uploaded' });
+            return res.status(400).json({ error: '이미지가 업로드되지 않았습니다.' });
         }
 
-        console.log('Received image, starting OCR...');
-        // Run OCR on the uploaded image buffer
-        const { data: { text } } = await Tesseract.recognize(req.file.buffer, 'eng');
-        const cleanedText = text.replace(/\n/g, ' ').trim();
-        
-        console.log(`Extracted text: ${cleanedText}`);
+        console.log(`Received image (${Math.round(req.file.size / 1024)} KB), starting OCR...`);
 
-        if (!cleanedText) {
-            return res.status(400).json({ error: 'Failed to extract text from the image.' });
+        // Run OCR on the uploaded image buffer
+        const { data: { text, lines } } = await Tesseract.recognize(req.file.buffer, 'eng');
+        
+        // Find the best line likely to be the title (ignore tiny words, publisher names like Scholastic)
+        let candidates = lines
+            ? lines.map(l => l.text.trim()).filter(l => l.length >= 3)
+            : text.split('\n').map(l => l.trim()).filter(l => l.length >= 3);
+
+        // Filter out common noise in book covers
+        const noiseWords = /scholastic|bestseller|new york times|author of|award|winner|illustrated by|written by|edition/i;
+        const filteredCandidates = candidates.filter(l => !noiseWords.test(l));
+
+        // Use the cleanest line or top lines
+        let cleanedTitle = (filteredCandidates[0] || candidates[0] || text)
+            .replace(/[^a-zA-Z0-9\s'’-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        console.log(`Extracted candidates:`, candidates);
+        console.log(`Cleaned title for search: "${cleanedTitle}"`);
+
+        if (!cleanedTitle) {
+            return res.status(400).json({ error: '사진에서 글자를 찾을 수 없습니다. 좀 더 밝고 선명하게 찍어주세요.' });
         }
 
         console.log('Searching for AR level...');
-        const results = await searchARLevel(cleanedText);
+        const results = await searchARLevel(cleanedTitle);
         
-        res.json({ success: true, data: results, extractedText: cleanedText });
+        res.json({ 
+            success: true, 
+            data: results, 
+            extractedText: cleanedTitle,
+            rawText: text.substring(0, 200)
+        });
     } catch (error) {
         console.error('OCR/Search error:', error);
-        res.status(500).json({ success: false, error: 'Failed to process image and search.' });
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || '사진 분석 중 오류가 발생했습니다.',
+            stack: error.stack 
+        });
     }
 });
 

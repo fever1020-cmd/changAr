@@ -119,7 +119,12 @@ async function searchARLevel(title) {
                 const ilMatch = cellHtml.match(/IL:\s*<strong>([^<]+)<\/strong>/i);
                 if (ilMatch) interestLevel = ilMatch[1].trim();
 
-                books.push({ title: bookTitle, author, arLevel, points, interestLevel });
+                // Extract Quiz No
+                let quizNo = '';
+                const quizMatch = cellHtml.match(/AR Quiz No\.\s*<strong>?(\d+)/i) || (pEl ? (pEl.innerText || pEl.textContent).match(/AR Quiz No\.\s*(\d+)/i) : null);
+                if (quizMatch) quizNo = quizMatch[1].trim();
+
+                books.push({ title: bookTitle, author, arLevel, points, interestLevel, quizNo });
                 if (books.length >= 5) break;
             }
 

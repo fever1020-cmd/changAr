@@ -87,6 +87,75 @@ app.post('/api/upload-and-search', upload.single('image'), async (req, res) => {
     }
 });
 
+// ISBN barcode → Book title lookup → AR level search
+const axios = require('axios');
+
+app.get('/api/isbn-search', async (req, res) => {
+    try {
+        const { isbn } = req.query;
+        if (!isbn) {
+            return res.status(400).json({ error: 'ISBN parameter is required' });
+        }
+
+        // Clean ISBN (remove dashes/spaces)
+        const cleanIsbn = isbn.replace(/[-\s]/g, '');
+        console.log(`[ISBN] Looking up ISBN: ${cleanIsbn}`);
+
+        let bookTitle = null;
+
+        // Try 1: Open Library API (free, no key needed)
+        try {
+            const olRes = await axios.get(`https://openlibrary.org/isbn/${cleanIsbn}.json`, { timeout: 5000 });
+            if (olRes.data && olRes.data.title) {
+                bookTitle = olRes.data.title;
+                console.log(`[ISBN] Open Library found: "${bookTitle}"`);
+            }
+        } catch (e) {
+            console.log('[ISBN] Open Library miss, trying Google Books...');
+        }
+
+        // Try 2: Google Books API (free, no key needed)
+        if (!bookTitle) {
+            try {
+                const gbRes = await axios.get(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`, { timeout: 5000 });
+                if (gbRes.data.totalItems > 0) {
+                    const vol = gbRes.data.items[0].volumeInfo;
+                    bookTitle = vol.title;
+                    if (vol.subtitle) bookTitle += ' ' + vol.subtitle;
+                    console.log(`[ISBN] Google Books found: "${bookTitle}"`);
+                }
+            } catch (e) {
+                console.log('[ISBN] Google Books also failed.');
+            }
+        }
+
+        if (!bookTitle) {
+            return res.json({
+                success: false,
+                error: `ISBN ${cleanIsbn}에 해당하는 책을 찾을 수 없습니다.`,
+                isbn: cleanIsbn,
+            });
+        }
+
+        // Now search AR level with the found title
+        console.log(`[ISBN] Searching AR level for: "${bookTitle}"`);
+        const results = await searchARLevel(bookTitle);
+
+        res.json({
+            success: true,
+            data: results,
+            bookTitle,
+            isbn: cleanIsbn,
+        });
+    } catch (error) {
+        console.error('[ISBN] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'ISBN 검색 중 오류 발생',
+        });
+    }
+});
+
 app.listen(port, '0.0.0.0', () => {
     console.log(`Server listening at http://0.0.0.0:${port}`);
 });
